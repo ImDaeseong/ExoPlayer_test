@@ -4,12 +4,17 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.media.AudioManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -46,6 +51,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        InitTitleBar();
+
         setContentView(R.layout.activity_main);
 
         checkPermissions();
@@ -111,6 +119,12 @@ public class MainActivity extends AppCompatActivity {
         btnPrevious.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+
+                float fvolume = simpleExoPlayer.getVolume();
+
+                simpleExoPlayer.getAudioComponent().setVolume(0f);
+                simpleExoPlayer.getAudioComponent().setVolume(fvolume);
+
                 PreplayPlayer();
             }
         });
@@ -141,6 +155,8 @@ public class MainActivity extends AppCompatActivity {
 
                 Uri uri = Uri.parse(musicList.get(CurrentPlayIndex).getMusicPath());
                 playPlayer(uri);
+                btnPlay.setVisibility(View.INVISIBLE);
+                btnPause.setVisibility(View.VISIBLE);
             }
         });
 
@@ -161,6 +177,8 @@ public class MainActivity extends AppCompatActivity {
 
                 Uri uri = Uri.parse(musicList.get(CurrentPlayIndex).getMusicPath());
                 playPlayer(uri);
+                btnPlay.setVisibility(View.INVISIBLE);
+                btnPause.setVisibility(View.VISIBLE);
             }
         });
 
@@ -208,7 +226,15 @@ public class MainActivity extends AppCompatActivity {
                 simpleExoPlayer.setPlayWhenReady(true);
             }
         });
+    }
 
+    private void InitTitleBar(){
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            Window window = getWindow();
+            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            window.setStatusBarColor(getResources().getColor(R.color.statusbar_bg));
+        }
     }
 
     private void checkPermissions() {
@@ -248,6 +274,7 @@ public class MainActivity extends AppCompatActivity {
                             break;
                         case ExoPlayer.STATE_ENDED:
 
+                            //현재곡 완료시 다음곡 자동시작
                             if(simpleExoPlayer != null) {
                                 if(!isPlaying()){
 
@@ -262,6 +289,8 @@ public class MainActivity extends AppCompatActivity {
 
                                     Uri uri = Uri.parse(musicList.get(CurrentPlayIndex).getMusicPath());
                                     playPlayer(uri);
+                                    btnPlay.setVisibility(View.INVISIBLE);
+                                    btnPause.setVisibility(View.VISIBLE);
                                 }
                             }
 
@@ -269,11 +298,14 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             });
+
+            simpleExoPlayer.setVolume(1.0f);
         }
     }
 
     private void releasePlayer(){
         if(simpleExoPlayer != null){
+            simpleExoPlayer.stop();
             simpleExoPlayer.release();
             simpleExoPlayer =null;
         }
@@ -380,5 +412,4 @@ public class MainActivity extends AppCompatActivity {
         });
         playerTimer.start();
     }
-
 }
