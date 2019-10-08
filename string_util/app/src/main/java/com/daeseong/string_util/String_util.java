@@ -37,7 +37,7 @@ public class String_util {
         return sResult;
     }
 
-    //파일 이름만
+    //파일 이름
     public static String getFileName(String url){
         String sResult = "";
         int nIndex = url.lastIndexOf("/");
