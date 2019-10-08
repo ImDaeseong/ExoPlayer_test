@@ -119,12 +119,6 @@ public class MainActivity extends AppCompatActivity {
         btnPrevious.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-
-                float fvolume = simpleExoPlayer.getVolume();
-
-                simpleExoPlayer.getAudioComponent().setVolume(0f);
-                simpleExoPlayer.getAudioComponent().setVolume(fvolume);
-
                 PreplayPlayer();
             }
         });
