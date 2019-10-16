@@ -2,6 +2,10 @@ package com.daeseong.string_util;
 
 import android.text.TextUtils;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.StringTokenizer;
+
 public class String_util {
 
     private String_util() {
@@ -85,6 +89,34 @@ public class String_util {
             }
         }
         return sResult;
+    }
+
+    //폴더 경로 분리
+    public static List<String> getSplitFolder(String url, String split){
+
+        List<String> arrayList = new ArrayList<>();
+
+        if (isEmpty(url)) {
+            return arrayList;
+        }
+
+        if (isEmpty(split)) {
+            arrayList.add(url);
+            return arrayList;
+        }
+
+        StringTokenizer stringTokenizer = new StringTokenizer(url, split);
+        try{
+            while (stringTokenizer.hasMoreTokens()){
+                arrayList.add(stringTokenizer.nextToken());
+            }
+        }catch (Exception ex){
+        }
+        return arrayList;
+    }
+
+    public static boolean isEmpty(String url) {
+        return url == null || url.trim().length() == 0;
     }
 
 }
