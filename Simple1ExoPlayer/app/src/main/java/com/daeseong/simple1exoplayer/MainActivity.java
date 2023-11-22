@@ -1,9 +1,9 @@
 package com.daeseong.simple1exoplayer;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
-
 import android.Manifest;
 import android.app.Service;
 import android.content.BroadcastReceiver;
@@ -12,7 +12,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.media.session.PlaybackState;
 import android.net.Uri;
 import android.os.Build;
@@ -26,7 +28,6 @@ import android.view.WindowManager;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.TextView;
-
 import java.util.ArrayList;
 import java.util.Formatter;
 import java.util.Locale;
@@ -51,6 +52,11 @@ public class MainActivity extends AppCompatActivity {
     private MarqueeTask taskMarquee;
     private Timer timerMarquee = null;
 
+    public ActivityResultLauncher<String[]> requestPermissions;
+
+    private static final String[] PERMISSIONS = new String[]{Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_EXTERNAL_STORAGE};
+    private static final String[] PERMISSIONS33 = new String[]{Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_MEDIA_AUDIO};
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -59,8 +65,7 @@ public class MainActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_main);
 
-        //SimpleExoPlayer 초기화
-        initalizePlayer();
+        initPermissionsLauncher();
 
         txtStartTime = findViewById(R.id.startTime);
         txtEndTime = findViewById(R.id.endTime);
@@ -202,14 +207,83 @@ public class MainActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             Window window = getWindow();
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-            window.setStatusBarColor(getResources().getColor(R.color.statusbar_bg));
+            window.setStatusBarColor(Color.rgb(255, 255, 255));
+        }
+
+        try {
+            //안드로이드 8.0 오레오 버전에서만 오류 발생
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+            supportRequestWindowFeature(Window.FEATURE_NO_TITLE);
+        } catch (Exception ex) {
+            Log.e(TAG, ex.getMessage().toString());
         }
     }
 
     private void checkPermissions() {
-        if (ActivityCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(MainActivity.this,   new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, 1);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            boolean bPermissResult = false;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+
+                for (String permission : PERMISSIONS33) {
+                    bPermissResult = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+                    if (!bPermissResult) {
+                        break;
+                    }
+                }
+
+                if (!bPermissResult) {
+                    requestPermissions.launch(PERMISSIONS33);
+                } else {
+                    Log.e(TAG, "PERMISSIONS33 권한 소유-SimpleExoPlayer 초기화");
+                    initalizePlayer();
+                }
+
+            } else {
+
+                for (String permission : PERMISSIONS) {
+                    bPermissResult = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+                    if (!bPermissResult) {
+                        break;
+                    }
+                }
+
+                if (!bPermissResult) {
+                    requestPermissions.launch(PERMISSIONS);
+                } else {
+                    Log.e(TAG, "PERMISSIONS 권한 소유-SimpleExoPlayer 초기화");
+                    initalizePlayer();
+                }
+            }
         }
+    }
+
+    private void initPermissionsLauncher() {
+
+        requestPermissions = registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), result -> {
+
+            boolean bPhone = false;
+            boolean bAudio = false;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+
+                bPhone = Boolean.TRUE.equals(result.get(Manifest.permission.READ_PHONE_STATE));
+                bAudio = Boolean.TRUE.equals(result.get(Manifest.permission.READ_MEDIA_AUDIO));
+
+            } else {
+
+                bPhone = Boolean.TRUE.equals(result.get(Manifest.permission.READ_PHONE_STATE));
+                bAudio = Boolean.TRUE.equals(result.get(Manifest.permission.READ_EXTERNAL_STORAGE));
+            }
+
+            if (bPhone && bAudio) {
+                Log.e(TAG, "PERMISSIONS 권한 소유-SimpleExoPlayer 초기화");
+                initalizePlayer();
+            } else {
+                Log.e(TAG, "PERMISSIONS 권한 미소유");
+            }
+        });
     }
 
     @Override
@@ -221,7 +295,7 @@ public class MainActivity extends AppCompatActivity {
         stopplayerTimer();
         releasePlayer();
 
-        if(broadcastReceiver != null){
+        if (broadcastReceiver != null) {
             unregisterReceiver(broadcastReceiver);
         }
 
@@ -229,7 +303,7 @@ public class MainActivity extends AppCompatActivity {
         unbindService(serviceConnection);
     }
 
-    private void initalizePlayer(){
+    private void initalizePlayer() {
 
         broadcastReceiver = new BroadcastReceiver() {
             @Override
@@ -382,9 +456,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void stopplayerTimer(){
-        if(playerTimer != null){
+        if (playerTimer != null) {
             playerTimer.stop();
-            playerTimer.removeMessages(0);
+            playerTimer = null;
         }
     }
 
@@ -400,16 +474,19 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onTick(long timeMillis) {
 
-                long position = getCurrentPosition();
-                long duration = getDuration();
+                if (isPlaying()) {
 
-                if (duration <= 0) return;
+                    long position = getCurrentPosition();
+                    long duration = getDuration();
 
-                seekBar.setMax((int) duration / 1000);
-                seekBar.setProgress((int) position / 1000);
+                    if (duration <= 0) return;
 
-                txtStartTime.setText(stringForTime((int)getCurrentPosition()));
-                txtEndTime.setText(stringForTime((int)getDuration()));
+                    seekBar.setMax((int) duration / 1000);
+                    seekBar.setProgress((int) position / 1000);
+
+                    txtStartTime.setText(stringForTime((int) getCurrentPosition()));
+                    txtEndTime.setText(stringForTime((int) getDuration()));
+                }
             }
         });
         playerTimer.start();
@@ -428,5 +505,4 @@ public class MainActivity extends AppCompatActivity {
         timerMarquee = new Timer();
         timerMarquee.schedule(taskMarquee, 0, 10000);
     }
-
 }

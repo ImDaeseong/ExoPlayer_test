@@ -11,5 +11,4 @@ public class MusicInfo {
     public void  setMusicPath(String musicPath){
         this.musicPath = musicPath;
     }
-
 }

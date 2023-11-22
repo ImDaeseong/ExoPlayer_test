@@ -1,17 +1,20 @@
 package com.daeseong.simple2exoplayer;
 
 import android.os.Handler;
-import android.os.Message;
+import android.os.Looper;
 
-public class PlayerTimer extends Handler {
+public class PlayerTimer {
 
     private static final int DEFAULT_INTERVAL_MILLIS = 1000;
 
     private boolean isUpdate = false;
-
     private Callback callback;
-
     private long startTimeMillis;
+    private Handler handler;
+
+    public PlayerTimer() {
+        handler = new Handler(Looper.getMainLooper());
+    }
 
     private void init() {
         startTimeMillis = System.currentTimeMillis();
@@ -20,25 +23,27 @@ public class PlayerTimer extends Handler {
     public void start() {
         init();
         isUpdate = true;
-        handleMessage(new Message());
+        handler.post(timerRunnable);
     }
 
     public void stop() {
         isUpdate = false;
+        handler.removeCallbacksAndMessages(null);
     }
 
     public void setCallback(Callback callback) {
         this.callback = callback;
     }
 
-    @Override
-    public void handleMessage(Message msg) {
-        this.removeMessages(0);
-        if (isUpdate) {
-            sendMessageDelayed(obtainMessage(0), DEFAULT_INTERVAL_MILLIS);
-            callback.onTick(System.currentTimeMillis() - startTimeMillis);
+    private final Runnable timerRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (isUpdate) {
+                callback.onTick(System.currentTimeMillis() - startTimeMillis);
+                handler.postDelayed(this, DEFAULT_INTERVAL_MILLIS);
+            }
         }
-    }
+    };
 
     public interface Callback {
         void onTick(long timeMillis);

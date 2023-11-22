@@ -5,43 +5,29 @@ import android.text.TextUtils;
 public class String_util {
 
     private String_util() {
-        throw new UnsupportedOperationException("String_util");
     }
 
     //파일 확장자
     public static String getFileExt(String url){
-        String sResult = "";
-        int nIndex = url.lastIndexOf(".");
-        if(nIndex >= 0){
-            sResult = url.substring(nIndex + 1);
-        }
-        return sResult;
+        int index = url.lastIndexOf(".");
+        return index >= 0 ? url.substring(index + 1) : "";
     }
 
     //파일 이름앞 폴더명
     public static String getLastFolderName(String url){
-        String sResult = "";
-        if(TextUtils.isEmpty(url)) return sResult;
+        if (TextUtils.isEmpty(url)) return "";
 
-        int nIndex = url.lastIndexOf("/");
-        if(nIndex >= 0){
-            String sTemp = url.substring(0, nIndex);
-
-            nIndex = sTemp.lastIndexOf("/");
-            if(nIndex >= 0){
-                sResult = sTemp.substring(nIndex + 1);
-            }
+        int lastSlash = url.lastIndexOf("/");
+        if (lastSlash >= 0) {
+            int secondLastSlash = url.lastIndexOf("/", lastSlash - 1);
+            return secondLastSlash >= 0 ? url.substring(secondLastSlash + 1, lastSlash) : "";
         }
-        return sResult;
+        return "";
     }
 
     //파일 이름
     public static String getFileName(String url){
-        String sResult = "";
-        int nIndex = url.lastIndexOf("/");
-        if(nIndex >= 0){
-            sResult = url.substring(nIndex + 1);
-        }
-        return sResult;
+        int lastSlash = url.lastIndexOf("/");
+        return lastSlash >= 0 ? url.substring(lastSlash + 1) : "";
     }
 }

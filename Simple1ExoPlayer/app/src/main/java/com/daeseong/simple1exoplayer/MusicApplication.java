@@ -9,19 +9,19 @@ public class MusicApplication extends Application {
     private static final String TAG = MusicApplication.class.getSimpleName();
 
     private static MusicApplication mInstance;
+    private static Context mContext;
+
     public static synchronized MusicApplication getInstance() {
         return mInstance;
     }
 
-    private static Context mContext;
-    public static Context getAppContext(){
+    public static Context getAppContext() {
         return mContext;
     }
 
     @Override
     public void onCreate() {
         super.onCreate();
-
         mInstance = this;
         mContext = getApplicationContext();
     }
@@ -30,5 +30,4 @@ public class MusicApplication extends Application {
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
     }
-
 }

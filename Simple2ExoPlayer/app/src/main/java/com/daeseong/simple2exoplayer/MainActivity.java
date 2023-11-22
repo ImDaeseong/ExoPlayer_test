@@ -1,36 +1,35 @@
 package com.daeseong.simple2exoplayer;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-
 import android.Manifest;
-import android.content.Context;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
-import android.media.AudioManager;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.TextView;
-
 import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.DefaultRenderersFactory;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
-import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
+import com.google.android.exoplayer2.source.ProgressiveMediaSource;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
-
 import java.util.ArrayList;
 import java.util.Formatter;
 import java.util.Locale;
@@ -48,6 +47,11 @@ public class MainActivity extends AppCompatActivity {
     private ArrayList<MusicInfo> musicList = new ArrayList<MusicInfo>();
     private int CurrentPlayIndex = -1;
 
+    public ActivityResultLauncher<String[]> requestPermissions;
+
+    private static final String[] PERMISSIONS = new String[]{Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_EXTERNAL_STORAGE};
+    private static final String[] PERMISSIONS33 = new String[]{Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_MEDIA_AUDIO};
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -56,10 +60,9 @@ public class MainActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_main);
 
-        checkPermissions();
+        initPermissionsLauncher();
 
-        //SimpleExoPlayer 초기화
-        initalizePlayer();
+        checkPermissions();
 
         txtStartTime = findViewById(R.id.startTime);
         txtEndTime = findViewById(R.id.endTime);
@@ -75,28 +78,23 @@ public class MainActivity extends AppCompatActivity {
                 musicList.clear();
                 Cursor cursor = getContentResolver().query(
                         MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                        new String[]
-                                {
-                                        MediaStore.Audio.AudioColumns.ARTIST,
-                                        MediaStore.Audio.AudioColumns.TITLE,
-                                        MediaStore.Audio.AudioColumns.DATA
-                                },
+                        new String[] { MediaStore.Audio.AudioColumns.ARTIST, MediaStore.Audio.AudioColumns.TITLE, MediaStore.Audio.AudioColumns.DATA },
                         MediaStore.Audio.AudioColumns.IS_MUSIC + " > 0",
                         null,
                         null
                 );
 
-                while(cursor.moveToNext())
-                {
-                    String sMusicPath = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.AudioColumns.DATA));
+                int nIndex = cursor.getColumnIndex(MediaStore.Audio.AudioColumns.DATA);
 
-                    //int nIndex = sMusicPath.lastIndexOf("/");
-                    //String sFileName = sMusicPath.substring(nIndex+1);
-                    //String sFilePath = sMusicPath.substring(0, nIndex+1);
-                    //Log.e(TAG, sFileName);
-                    //Log.e(TAG, sFilePath);
+                while(cursor.moveToNext()) {
 
-                    if( sMusicPath.contains("music3")){
+                    if (nIndex == -1) {
+                        continue;
+                    }
+
+                    String sMusicPath = cursor.getString(nIndex);
+
+                    if( sMusicPath.contains("music2")){
                         MusicInfo info = new MusicInfo();
                         info.setMusicPath(sMusicPath);
                         musicList.add(info);
@@ -110,7 +108,6 @@ public class MainActivity extends AppCompatActivity {
                 playPlayer(uri);
                 btnPlay.setVisibility(View.INVISIBLE);
                 btnPause.setVisibility(View.VISIBLE);
-
             }
         });
 
@@ -227,14 +224,83 @@ public class MainActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             Window window = getWindow();
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-            window.setStatusBarColor(getResources().getColor(R.color.statusbar_bg));
+            window.setStatusBarColor(Color.rgb(255, 255, 255));
+        }
+
+        try {
+            //안드로이드 8.0 오레오 버전에서만 오류 발생
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+            supportRequestWindowFeature(Window.FEATURE_NO_TITLE);
+        } catch (Exception ex) {
+            Log.e(TAG, ex.getMessage().toString());
         }
     }
 
     private void checkPermissions() {
-        if (ActivityCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(MainActivity.this,   new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, 1);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            boolean bPermissResult = false;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+
+                for (String permission : PERMISSIONS33) {
+                    bPermissResult = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+                    if (!bPermissResult) {
+                        break;
+                    }
+                }
+
+                if (!bPermissResult) {
+                    requestPermissions.launch(PERMISSIONS33);
+                } else {
+                    Log.e(TAG, "PERMISSIONS33 권한 소유-SimpleExoPlayer 초기화");
+                    initalizePlayer();
+                }
+
+            } else {
+
+                for (String permission : PERMISSIONS) {
+                    bPermissResult = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+                    if (!bPermissResult) {
+                        break;
+                    }
+                }
+
+                if (!bPermissResult) {
+                    requestPermissions.launch(PERMISSIONS);
+                } else {
+                    Log.e(TAG, "PERMISSIONS 권한 소유-SimpleExoPlayer 초기화");
+                    initalizePlayer();
+                }
+            }
         }
+    }
+
+    private void initPermissionsLauncher() {
+
+        requestPermissions = registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), result -> {
+
+            boolean bPhone = false;
+            boolean bAudio = false;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+
+                bPhone = Boolean.TRUE.equals(result.get(Manifest.permission.READ_PHONE_STATE));
+                bAudio = Boolean.TRUE.equals(result.get(Manifest.permission.READ_MEDIA_AUDIO));
+
+            } else {
+
+                bPhone = Boolean.TRUE.equals(result.get(Manifest.permission.READ_PHONE_STATE));
+                bAudio = Boolean.TRUE.equals(result.get(Manifest.permission.READ_EXTERNAL_STORAGE));
+            }
+
+            if (bPhone && bAudio) {
+                Log.e(TAG, "PERMISSIONS 권한 소유-SimpleExoPlayer 초기화");
+                initalizePlayer();
+            } else {
+                Log.e(TAG, "PERMISSIONS 권한 미소유");
+            }
+        });
     }
 
     @Override
@@ -248,7 +314,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void initalizePlayer(){
 
-        if(simpleExoPlayer == null){
+        if (simpleExoPlayer == null) {
 
             DefaultRenderersFactory defaultRenderersFactory = new DefaultRenderersFactory(this.getApplicationContext());
             DefaultTrackSelector defaultTrackSelector = new DefaultTrackSelector();
@@ -261,12 +327,16 @@ public class MainActivity extends AppCompatActivity {
                 public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
                     switch (playbackState) {
                         case ExoPlayer.STATE_READY:
+                            Log.e(TAG, "재생 준비 완료");
                             break;
                         case ExoPlayer.STATE_BUFFERING:
+                            Log.e(TAG, "재생 준비");
                             break;
                         case ExoPlayer.STATE_IDLE:
+                            Log.e(TAG, "재생 실패");
                             break;
                         case ExoPlayer.STATE_ENDED:
+                            Log.e(TAG, "재생 마침");
 
                             //현재곡 완료시 다음곡 자동시작
                             if(simpleExoPlayer != null) {
@@ -298,10 +368,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void releasePlayer(){
-        if(simpleExoPlayer != null){
+        if (simpleExoPlayer != null) {
             simpleExoPlayer.stop();
             simpleExoPlayer.release();
-            simpleExoPlayer =null;
+            simpleExoPlayer = null;
         }
     }
 
@@ -324,20 +394,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void stopPlayer(){
-        if(simpleExoPlayer != null){
+        if (simpleExoPlayer != null) {
             simpleExoPlayer.stop();
         }
     }
 
     private boolean isPlaying(){
-        if(simpleExoPlayer != null) {
+        if (simpleExoPlayer != null) {
             return simpleExoPlayer.getPlaybackState() == Player.STATE_READY;
         }
         return false;
     }
 
     private void PreplayPlayer(){
-        if(simpleExoPlayer != null) {
+        if (simpleExoPlayer != null) {
             long position = simpleExoPlayer.getCurrentPosition();
             position -= 3000;
             simpleExoPlayer.seekTo(position);
@@ -352,9 +422,9 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private MediaSource getMediaSource(Uri uri){
+    private MediaSource getMediaSource(Uri uri) {
         String sUserAgent = Util.getUserAgent(this, getPackageName());
-        return new ExtractorMediaSource.Factory(new DefaultDataSourceFactory(this, sUserAgent)).createMediaSource(uri);
+        return new ProgressiveMediaSource.Factory(new DefaultDataSourceFactory(this, sUserAgent)).createMediaSource(uri);
     }
 
     private String stringForTime(int timeMs) {
@@ -377,13 +447,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void stopplayerTimer(){
-        if(playerTimer != null){
+        if (playerTimer != null) {
             playerTimer.stop();
-            playerTimer.removeMessages(0);
+            playerTimer = null;
         }
     }
 
-    private void setSeekBarProgress(){
+    private void setSeekBarProgress() {
 
         stopplayerTimer();
 
@@ -392,16 +462,19 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onTick(long timeMillis) {
 
-                long position = simpleExoPlayer.getCurrentPosition();
-                long duration = simpleExoPlayer.getDuration();
+                if (simpleExoPlayer.isPlaying()) {
 
-                if (duration <= 0) return;
+                    long position = simpleExoPlayer.getCurrentPosition();
+                    long duration = simpleExoPlayer.getDuration();
 
-                seekBar.setMax((int) duration / 1000);
-                seekBar.setProgress((int) position / 1000);
+                    if (duration <= 0) return;
 
-                txtStartTime.setText(stringForTime((int)simpleExoPlayer.getCurrentPosition()));
-                txtEndTime.setText(stringForTime((int)simpleExoPlayer.getDuration()));
+                    seekBar.setMax((int) duration / 1000);
+                    seekBar.setProgress((int) position / 1000);
+
+                    txtStartTime.setText(stringForTime((int) simpleExoPlayer.getCurrentPosition()));
+                    txtEndTime.setText(stringForTime((int) simpleExoPlayer.getDuration()));
+                }
             }
         });
         playerTimer.start();

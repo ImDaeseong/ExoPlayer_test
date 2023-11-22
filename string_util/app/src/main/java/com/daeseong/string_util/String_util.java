@@ -1,99 +1,95 @@
 package com.daeseong.string_util;
 
 import android.text.TextUtils;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
 
 public class String_util {
 
-    private String_util() {
-        throw new UnsupportedOperationException("String_util");
-    }
-
     //파일 확장자
-    public static String getFileExt(String url){
-        String sResult = "";
-        int nIndex = url.lastIndexOf(".");
-        if(nIndex >= 0){
-            sResult = url.substring(nIndex + 1);
+    public static String getFileExt(String url) {
+        String result = "";
+        int lastIndex = url.lastIndexOf(".");
+        if (lastIndex >= 0) {
+            result = url.substring(lastIndex + 1);
         }
-        return sResult;
+        return result;
     }
 
     //파일 이름만
-    public static String getOnlyFileName(String url){
-        String sResult = "";
-        int nIndex = url.lastIndexOf("/");
-        if(nIndex >= 0){
-            String sTemp = url.substring(nIndex +1 );
-            nIndex = sTemp.lastIndexOf(".");
-            if(nIndex >= 0){
-                sResult = sTemp.substring(0, nIndex);
+    public static String getOnlyFileName(String url) {
+        String result = "";
+        int lastSlashIndex = url.lastIndexOf("/");
+        int lastIndex;
+
+        if (lastSlashIndex >= 0) {
+            String temp = url.substring(lastSlashIndex + 1);
+            lastIndex = temp.lastIndexOf(".");
+            if (lastIndex >= 0) {
+                result = temp.substring(0, lastIndex);
             }
-        }else {
-            nIndex = url.lastIndexOf(".");
-            if(nIndex >= 0){
-                sResult = url.substring(0, nIndex);
+        } else {
+            lastIndex = url.lastIndexOf(".");
+            if (lastIndex >= 0) {
+                result = url.substring(0, lastIndex);
             }
         }
-        return sResult;
+        return result;
     }
 
     //파일 이름
-    public static String getFileName(String url){
-        String sResult = "";
-        int nIndex = url.lastIndexOf("/");
-        if(nIndex >= 0){
-            sResult = url.substring(nIndex + 1);
+    public static String getFileName(String url) {
+        String result = "";
+        int lastSlashIndex = url.lastIndexOf("/");
+        if (lastSlashIndex >= 0) {
+            result = url.substring(lastSlashIndex + 1);
         }
-        return sResult;
+        return result;
     }
 
     //파일 경로
-    public static String getFilePath(String url){
-        String sResult = "";
-        int nIndex = url.lastIndexOf("/");
-        if(nIndex >= 0){
-            sResult = url.substring(0, nIndex);
+    public static String getFilePath(String url) {
+        String result = "";
+        int lastSlashIndex = url.lastIndexOf("/");
+        if (lastSlashIndex >= 0) {
+            result = url.substring(0, lastSlashIndex);
         }
-        return sResult;
+        return result;
     }
 
     //파일 경로 / 포함
     public static String getFilePathSlash(String url) {
-        String sResult = "";
-        if(TextUtils.isEmpty(url)) return sResult;
+        String result = "";
+        if (TextUtils.isEmpty(url)) return result;
 
         if (url.charAt(url.length() - 1) != '/') {
-            sResult = url.substring(0, url.lastIndexOf('/') + 1);
+            result = url.substring(0, url.lastIndexOf('/') + 1);
         } else {
-            sResult = url.substring(0, url.lastIndexOf('/', url.lastIndexOf('/') - 1) + 1);
+            result = url.substring(0, url.lastIndexOf('/', url.lastIndexOf('/') - 1) + 1);
         }
-        return sResult;
+        return result;
     }
 
     //파일 이름앞 폴더명
-    public static String getLastFolderName(String url){
-        String sResult = "";
-        if(TextUtils.isEmpty(url)) return sResult;
+    public static String getLastFolderName(String url) {
+        String result = "";
+        if (TextUtils.isEmpty(url)) return result;
 
-        int nIndex = url.lastIndexOf("/");
-        if(nIndex >= 0){
-            String sTemp = url.substring(0, nIndex);
+        int lastSlashIndex = url.lastIndexOf("/");
+        if (lastSlashIndex >= 0) {
+            String temp = url.substring(0, lastSlashIndex);
 
-            nIndex = sTemp.lastIndexOf("/");
-            if(nIndex >= 0){
-                sResult = sTemp.substring(nIndex + 1);
+            lastSlashIndex = temp.lastIndexOf("/");
+            if (lastSlashIndex >= 0) {
+                result = temp.substring(lastSlashIndex + 1);
             }
         }
-        return sResult;
+        return result;
     }
 
     //폴더 경로 분리
-    public static List<String> getSplitFolder(String url, String split){
-
+    public static List<String> getSplitFolder(String url, String split) {
         List<String> arrayList = new ArrayList<>();
 
         if (isEmpty(url)) {
@@ -106,11 +102,11 @@ public class String_util {
         }
 
         StringTokenizer stringTokenizer = new StringTokenizer(url, split);
-        try{
-            while (stringTokenizer.hasMoreTokens()){
+        try {
+            while (stringTokenizer.hasMoreTokens()) {
                 arrayList.add(stringTokenizer.nextToken());
             }
-        }catch (Exception ex){
+        } catch (Exception ex) {
         }
         return arrayList;
     }
@@ -118,5 +114,4 @@ public class String_util {
     public static boolean isEmpty(String url) {
         return url == null || url.trim().length() == 0;
     }
-
 }

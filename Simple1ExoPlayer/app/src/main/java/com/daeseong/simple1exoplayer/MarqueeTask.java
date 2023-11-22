@@ -2,52 +2,46 @@ package com.daeseong.simple1exoplayer;
 
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.widget.TextView;
-
-import android.os.Handler;
 import java.util.TimerTask;
 
 public class MarqueeTask extends TimerTask {
 
-    private Handler handler = null;
-    private TextView tv;
-    private boolean bFlag = false;
+    private Handler handler;
+    private TextView textView;
+    private boolean isFlag = false;
 
-    public MarqueeTask(TextView tv){
-        this.tv = tv;
-        handler = new Handler();
+    public MarqueeTask(TextView textView) {
+        this.textView = textView;
+        this.handler = new Handler(Looper.getMainLooper());
     }
 
+    @Override
     public void run() {
-        handler.post(new Runnable() {
-            public void run() {
-                marquee(tv, bFlag);
-            }});
+        handler.post(() -> marquee(textView, isFlag));
     }
 
-    private void marquee(View view, boolean bFlag){
-        if(bFlag) {
-            ObjectAnimator animator1 = ObjectAnimator.ofFloat(view, "translationX", 0f, -1000f);
-            animator1.setDuration(500);
+    private void marquee(View view, boolean isFlag) {
+        ObjectAnimator animator1, animator2;
 
-            ObjectAnimator animator2 = ObjectAnimator.ofFloat(view, "translationX", 1000f, 0f);
-            animator2.setDuration(500);
-
-            AnimatorSet animatorSet = new AnimatorSet();
-            animatorSet.playSequentially(animator1, animator2);
-            animatorSet.start();
-        }else {
-            ObjectAnimator animator1 = ObjectAnimator.ofFloat(view, "translationX",  0f, 1000f);
-            animator1.setDuration(500);
-
-            ObjectAnimator animator2 = ObjectAnimator.ofFloat(view, "translationX", -1000f, 0f);
-            animator2.setDuration(500);
-
-            AnimatorSet animatorSet = new AnimatorSet();
-            animatorSet.playSequentially(animator1, animator2);
-            animatorSet.start();
+        if (isFlag) {
+            animator1 = ObjectAnimator.ofFloat(view, "translationX", 0f, -1000f);
+            animator2 = ObjectAnimator.ofFloat(view, "translationX", 1000f, 0f);
+        } else {
+            animator1 = ObjectAnimator.ofFloat(view, "translationX", 0f, 1000f);
+            animator2 = ObjectAnimator.ofFloat(view, "translationX", -1000f, 0f);
         }
-        this.bFlag = !bFlag;
+
+        animator1.setDuration(500);
+        animator2.setDuration(500);
+
+        AnimatorSet animatorSet = new AnimatorSet();
+        animatorSet.playSequentially(animator1, animator2);
+        animatorSet.start();
+
+        this.isFlag = !isFlag;
     }
 }
