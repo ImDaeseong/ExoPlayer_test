@@ -1,17 +1,14 @@
 package com.daeseong.simple2exoplayer
 
 import android.os.Handler
-import android.os.Message
+import android.os.Looper
 
-class PlayerTimer : Handler() {
-
-    companion object {
-        private const val DEFAULT_INTERVAL_MILLIS = 1000
-    }
-
+class PlayerTimer {
+    private val DEFAULT_INTERVAL_MILLIS = 1000L
     private var isUpdate = false
     private var callback: Callback? = null
     private var startTimeMillis: Long = 0
+    private val handler: Handler = Handler(Looper.getMainLooper())
 
     private fun init() {
         startTimeMillis = System.currentTimeMillis()
@@ -20,27 +17,28 @@ class PlayerTimer : Handler() {
     fun start() {
         init()
         isUpdate = true
-        handleMessage(Message())
+        handler.post(timerRunnable)
     }
 
     fun stop() {
         isUpdate = false
+        handler.removeCallbacksAndMessages(null)
     }
 
-    fun setCallback(callback: Callback?) {
+    fun setCallback(callback: Callback) {
         this.callback = callback
     }
 
-    override fun handleMessage(msg: Message) {
-        this.removeMessages(0)
-        if (isUpdate) {
-            sendMessageDelayed(obtainMessage(0), DEFAULT_INTERVAL_MILLIS.toLong())
-            callback!!.onTick(System.currentTimeMillis() - startTimeMillis)
+    private val timerRunnable: Runnable = object : Runnable {
+        override fun run() {
+            if (isUpdate) {
+                callback?.onTick(System.currentTimeMillis() - startTimeMillis)
+                handler.postDelayed(this, DEFAULT_INTERVAL_MILLIS)
+            }
         }
     }
 
     interface Callback {
         fun onTick(timeMillis: Long)
     }
-
 }

@@ -1,101 +1,83 @@
 package com.daeseong.simple1exoplayer
 
-
 import android.app.Service
 import android.content.Intent
 import android.media.session.PlaybackState
 import android.net.Uri
 import android.os.Binder
 import android.os.IBinder
-import androidx.annotation.Nullable
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.google.android.exoplayer2.*
-import com.google.android.exoplayer2.source.ExtractorMediaSource
 import com.google.android.exoplayer2.source.MediaSource
+import com.google.android.exoplayer2.source.ProgressiveMediaSource
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
+import com.google.android.exoplayer2.util.Log
 import com.google.android.exoplayer2.util.Util
-
 
 class MusicService : Service() {
 
+    private val tag = MusicService::class.java.simpleName
+
     private var simpleExoPlayer: SimpleExoPlayer? = null
-    private var localBroadcastManager: LocalBroadcastManager? = null
-    private val binder: Binder = MusicBinder()
+    private lateinit var localBroadcastManager: LocalBroadcastManager
+    private val binder = MusicBinder()
 
     inner class MusicBinder : Binder() {
-        val musicService: MusicService
-            get() = this@MusicService
+        fun getMusicService(): MusicService {
+            return this@MusicService
+        }
     }
 
     override fun onCreate() {
+        super.onCreate()
 
-        val defaultRenderersFactory = DefaultRenderersFactory(this.applicationContext)
+        Log.e(tag, "onCreate")
+
+        val defaultRenderersFactory = DefaultRenderersFactory(applicationContext)
         val defaultTrackSelector = DefaultTrackSelector()
         val defaultLoadControl = DefaultLoadControl()
 
         localBroadcastManager = LocalBroadcastManager.getInstance(this)
 
-        simpleExoPlayer = ExoPlayerFactory.newSimpleInstance(
-            this.applicationContext,
-            defaultRenderersFactory,
-            defaultTrackSelector,
-            defaultLoadControl
-        )
+        simpleExoPlayer = ExoPlayerFactory.newSimpleInstance(applicationContext, defaultRenderersFactory, defaultTrackSelector, defaultLoadControl)
 
-        simpleExoPlayer!!.addListener(object : Player.EventListener {
-
+        simpleExoPlayer?.addListener(object : Player.EventListener {
             override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
-
                 when (playbackState) {
 
                     ExoPlayer.STATE_BUFFERING -> {
-
-                        //재생 준비
-                        val intent = Intent("com.daeseong.simple1exoplayer.PLAYER_STATUS")
-                        intent.putExtra("state", PlaybackState.STATE_BUFFERING)
-                        localBroadcastManager!!.sendBroadcast(intent)
+                        Log.e(tag, "재생 준비")
+                        sendPlayerStatusBroadcast(PlaybackState.STATE_BUFFERING)
                     }
 
                     ExoPlayer.STATE_READY -> {
-
-                        //재생 준비 완료
-                        val intent = Intent("com.daeseong.simple1exoplayer.PLAYER_STATUS")
-                        if (playWhenReady) {
-                            intent.putExtra("state", PlaybackState.STATE_PLAYING)
-                        } else {
-                            intent.putExtra("state", PlaybackState.STATE_PAUSED)
-                        }
-                        localBroadcastManager!!.sendBroadcast(intent)
+                        Log.e(tag, "재생 준비 완료")
+                        sendPlayerStatusBroadcast(
+                            if (playWhenReady) PlaybackState.STATE_PLAYING
+                            else PlaybackState.STATE_PAUSED
+                        )
                     }
 
                     ExoPlayer.STATE_ENDED -> {
-
-                        //재생 마침
-                        val intent = Intent("com.daeseong.simple1exoplayer.PLAYER_STATUS")
-                        intent.putExtra("state", PlaybackState.STATE_NONE)
-                        localBroadcastManager!!.sendBroadcast(intent)
+                        Log.e(tag, "재생 마침")
+                        sendPlayerStatusBroadcast(PlaybackState.STATE_NONE)
                     }
 
                     ExoPlayer.STATE_IDLE -> {
-
-                        //재생실패
-                        val intent = Intent("com.daeseong.simple1exoplayer.PLAYER_STATUS")
-                        intent.putExtra("state", PlaybackState.STATE_ERROR)
-                        localBroadcastManager!!.sendBroadcast(intent)
+                        Log.e(tag, "재생 실패")
+                        sendPlayerStatusBroadcast(PlaybackState.STATE_ERROR)
                     }
                 }
             }
         })
-        super.onCreate()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         return super.onStartCommand(intent, flags, startId)
     }
 
-    @Nullable
-    override fun onBind(intent: Intent?): IBinder? {
+    override fun onBind(intent: Intent?): IBinder {
         return binder
     }
 
@@ -103,91 +85,78 @@ class MusicService : Service() {
         return super.onUnbind(intent)
     }
 
-    fun playPlayer(sUrl: String?) {
-        if (simpleExoPlayer != null) {
+    fun playPlayer(sUrl: String) {
+        simpleExoPlayer?.let {
             val mediaSource = getMediaSource(Uri.parse(sUrl))
-            simpleExoPlayer!!.prepare(mediaSource, true, false)
-            simpleExoPlayer!!.playWhenReady = true
+            it.prepare(mediaSource, true, false)
+            it.playWhenReady = true
         }
     }
 
-    fun playPlayer(uri: Uri?) {
-        if (simpleExoPlayer != null) {
-            val mediaSource = getMediaSource(uri!!)
-            simpleExoPlayer!!.prepare(mediaSource, true, false)
-            simpleExoPlayer!!.playWhenReady = true
+    fun playPlayer(uri: Uri) {
+        simpleExoPlayer?.let {
+            val mediaSource = getMediaSource(uri)
+            it.prepare(mediaSource, true, false)
+            it.playWhenReady = true
         }
     }
 
     fun stopPlayer() {
-        if (simpleExoPlayer != null) {
-            simpleExoPlayer!!.stop()
-        }
+        simpleExoPlayer?.stop()
     }
 
     fun releasePlayer() {
-        if (simpleExoPlayer != null) {
-            simpleExoPlayer!!.stop()
-            simpleExoPlayer!!.release()
+        simpleExoPlayer?.let {
+            it.stop()
+            it.release()
             simpleExoPlayer = null
         }
     }
 
     fun isPlaying(): Boolean {
-        return if (simpleExoPlayer != null) {
-            simpleExoPlayer!!.playbackState == Player.STATE_READY
-        } else false
+        return simpleExoPlayer?.playbackState == Player.STATE_READY
     }
 
-    fun PreplayPlayer() {
-        if (simpleExoPlayer != null) {
-            var position = simpleExoPlayer!!.currentPosition
+    fun preplayPlayer() {
+        simpleExoPlayer?.let {
+            var position = it.currentPosition
             position -= 3000
-            simpleExoPlayer!!.seekTo(position)
+            it.seekTo(position)
         }
     }
 
-    fun NextplayPlayer() {
-        if (simpleExoPlayer != null) {
-            var position = simpleExoPlayer!!.currentPosition
+    fun nextplayPlayer() {
+        simpleExoPlayer?.let {
+            var position = it.currentPosition
             position += 3000
-            simpleExoPlayer!!.seekTo(position)
+            it.seekTo(position)
         }
     }
 
     fun setPlayWhenReady(bReady: Boolean) {
-        if (simpleExoPlayer != null) {
-            simpleExoPlayer!!.playWhenReady = bReady
-        }
+        simpleExoPlayer?.playWhenReady = bReady
     }
 
     fun getCurrentPosition(): Long {
-        var position: Long = 0
-        if (simpleExoPlayer != null) {
-            position = simpleExoPlayer!!.currentPosition
-        }
-        return position
+        return simpleExoPlayer?.currentPosition ?: 0
     }
 
     fun getDuration(): Long {
-        var duration: Long = 0
-        if (simpleExoPlayer != null) {
-            duration = simpleExoPlayer!!.duration
-        }
-        return duration
+        return simpleExoPlayer?.duration ?: 0
     }
 
     fun seekTo(progress: Long) {
-        if (simpleExoPlayer != null) {
-            simpleExoPlayer!!.seekTo(progress)
-        }
+        simpleExoPlayer?.seekTo(progress)
     }
 
-    private fun getMediaSource(uri: Uri): MediaSource? {
+    private fun getMediaSource(uri: Uri): MediaSource {
+        val userAgent = Util.getUserAgent(this, packageName)
+        return ProgressiveMediaSource.Factory(DefaultDataSourceFactory(this, userAgent)).createMediaSource(uri)
+    }
 
-        val sUserAgent = Util.getUserAgent(this, packageName)
-        return ExtractorMediaSource.Factory(DefaultDataSourceFactory(this, sUserAgent)).createMediaSource(
-            uri
-        )
+    private fun sendPlayerStatusBroadcast(state: Int) {
+        val intent = Intent("com.daeseong.simple1exoplayer.PLAYER_STATUS")
+        intent.putExtra("state", state)
+        localBroadcastManager.sendBroadcast(intent)
     }
 }

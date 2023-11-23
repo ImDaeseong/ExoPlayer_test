@@ -40,8 +40,6 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'//androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
 
     implementation 'com.google.android.exoplayer:exoplayer:2.10.5'
-
     implementation 'com.mpatric:mp3agic:0.9.1'
-
     implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.0.0'
 }
