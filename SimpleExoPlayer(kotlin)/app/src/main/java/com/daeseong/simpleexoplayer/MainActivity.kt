@@ -10,14 +10,16 @@ import android.view.View
 import android.view.Window
 import android.view.WindowManager
 import android.widget.Button
+import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.exoplayer2.*
-import com.google.android.exoplayer2.source.MediaSource
-import com.google.android.exoplayer2.source.ProgressiveMediaSource
-import com.google.android.exoplayer2.trackselection.DefaultTrackSelector
-import com.google.android.exoplayer2.ui.PlayerView
-import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
-import com.google.android.exoplayer2.util.Util
+import androidx.media3.common.*
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.util.Util
+import androidx.media3.datasource.DefaultDataSourceFactory
+import androidx.media3.exoplayer.*
+import androidx.media3.exoplayer.source.*
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.ui.PlayerView
 
 class MainActivity : AppCompatActivity() {
 
@@ -27,9 +29,8 @@ class MainActivity : AppCompatActivity() {
     private val AUDIO_ASSET = "asset:///The Lazy Song.mp3"
 
     private lateinit var button1: Button
-
     private lateinit var playerView: PlayerView
-    private var simpleExoPlayer: SimpleExoPlayer? = null
+    private var simpleExoPlayer: ExoPlayer? = null
 
     private var currentPosition: Long = 0
     private var currentWindowIndex = 0
@@ -37,15 +38,12 @@ class MainActivity : AppCompatActivity() {
     private var isVideoPlaying = false
 
     private fun initTitleBar() {
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            val window: Window = window
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
             window.statusBarColor = Color.rgb(255, 255, 255)
         }
 
         try {
-            // 안드로이드 8.0 오레오 버전에서만 오류 발생
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             supportRequestWindowFeature(Window.FEATURE_NO_TITLE)
         } catch (ex: Exception) {
@@ -54,29 +52,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ExoPlayer 초기화
+    @OptIn(UnstableApi::class)
     private fun initializePlayer(mediaUrl: String) {
-
         if (simpleExoPlayer == null) {
-
-            // 기본 설정값으로 인스턴스 생성
-            val defaultRenderersFactory = DefaultRenderersFactory(applicationContext)
-            val defaultTrackSelector = DefaultTrackSelector()
+            val defaultTrackSelector = DefaultTrackSelector(this)
             val defaultLoadControl = DefaultLoadControl()
 
-            simpleExoPlayer = ExoPlayerFactory.newSimpleInstance(
-                applicationContext, defaultRenderersFactory, defaultTrackSelector, defaultLoadControl
-            )
+            simpleExoPlayer = ExoPlayer.Builder(this)
+                .setTrackSelector(defaultTrackSelector)
+                .setLoadControl(defaultLoadControl)
+                .build()
 
             // ExoPlayer 이벤트 리스너 설정
-            simpleExoPlayer?.addListener(object : Player.EventListener{
-
-                override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
-                    super.onPlayerStateChanged(playWhenReady, playbackState)
+            simpleExoPlayer?.addListener(object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
                     handlePlayerStateChanged(playbackState)
                 }
 
-                override fun onPlayerError(error: ExoPlaybackException?) {
-                    super.onPlayerError(error)
+                override fun onPlayerError(error: PlaybackException) {
                     handleError()
                 }
             })
@@ -87,27 +80,28 @@ class MainActivity : AppCompatActivity() {
 
         // 미디어 소스 준비
         val mediaSource: MediaSource = getMediaSource(Uri.parse(mediaUrl))
-        simpleExoPlayer?.prepare(mediaSource, true, false)
+        simpleExoPlayer?.setMediaSource(mediaSource)
+        simpleExoPlayer?.prepare()
         simpleExoPlayer?.playWhenReady = playWhenReady
     }
 
     // ExoPlayer 상태에 따른 처리
     private fun handlePlayerStateChanged(playbackState: Int) {
         when (playbackState) {
-            ExoPlayer.STATE_READY -> {
-                Log.e(tag, "재생 준비 완료")
+            Player.STATE_READY -> {
+                Log.d(tag, "재생 준비 완료")
                 button1.visibility = View.GONE
             }
-            ExoPlayer.STATE_BUFFERING -> {
-                Log.e(tag, "재생 준비")
+            Player.STATE_BUFFERING -> {
+                Log.d(tag, "재생 준비 중")
                 button1.visibility = View.GONE
             }
-            ExoPlayer.STATE_IDLE -> {
-                Log.e(tag, "재생 실패")
+            Player.STATE_IDLE -> {
+                Log.d(tag, "재생 실패")
                 button1.visibility = View.VISIBLE
             }
-            ExoPlayer.STATE_ENDED -> {
-                Log.e(tag, "재생 마침")
+            Player.STATE_ENDED -> {
+                Log.d(tag, "재생 마침")
                 button1.visibility = View.VISIBLE
             }
         }
@@ -120,46 +114,49 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ExoPlayer 해제
+    @OptIn(UnstableApi::class)
     private fun releasePlayer() {
-
-        if (simpleExoPlayer != null) {
-            currentPosition = simpleExoPlayer!!.currentPosition
-            currentWindowIndex = simpleExoPlayer!!.currentWindowIndex
-            playWhenReady = simpleExoPlayer!!.playWhenReady
+        simpleExoPlayer?.let {
+            currentPosition = it.currentPosition
+            currentWindowIndex = it.currentWindowIndex
+            playWhenReady = it.playWhenReady
 
             // 플레이어와 화면 연결 해제
             playerView.player = null
-            simpleExoPlayer!!.release()
+            it.release()
             simpleExoPlayer = null
         }
     }
 
     // 미디어 재생
+    @OptIn(UnstableApi::class)
     private fun playMedia(uri: Uri) {
-
-        if (simpleExoPlayer != null) {
+        simpleExoPlayer?.let {
             val mediaSource: MediaSource = getMediaSource(uri)
-            simpleExoPlayer!!.prepare(mediaSource, true, false)
-            simpleExoPlayer!!.playWhenReady = playWhenReady
+            it.setMediaSource(mediaSource)
+            it.prepare()
+            it.playWhenReady = playWhenReady
         }
     }
 
     // 미디어 정지
+    @OptIn(UnstableApi::class)
     private fun stopPlayer() {
-        if (simpleExoPlayer != null) {
-            currentPosition = simpleExoPlayer!!.currentPosition
-            currentWindowIndex = simpleExoPlayer!!.currentWindowIndex
-            playWhenReady = simpleExoPlayer!!.playWhenReady
+        simpleExoPlayer?.let {
+            currentPosition = it.currentPosition
+            currentWindowIndex = it.currentWindowIndex
+            playWhenReady = it.playWhenReady
 
             // 플레이어 정지
-            simpleExoPlayer!!.stop()
+            it.stop()
         }
     }
 
     // 미디어 소스 가져오기
+    @OptIn(UnstableApi::class)
     private fun getMediaSource(uri: Uri): MediaSource {
-        val userAgent: String = Util.getUserAgent(this, packageName)
-        return ProgressiveMediaSource.Factory(DefaultDataSourceFactory(this, userAgent)).createMediaSource(uri)
+        val dataSourceFactory = DefaultDataSourceFactory(this, Util.getUserAgent(this, packageName))
+        return ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(MediaItem.fromUri(uri))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -170,10 +167,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         playerView = findViewById(R.id.playerView)
-
         button1 = findViewById(R.id.button1)
         button1.setOnClickListener {
-
             stopPlayer()
 
             if (isVideoPlaying) {
@@ -187,19 +182,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @OptIn(UnstableApi::class)
     override fun onStart() {
         super.onStart()
 
-        // Android 버전이 23 이상
         if (Util.SDK_INT > 23) {
             initializePlayer(VIDEO_URL)
         }
     }
 
+    @OptIn(UnstableApi::class)
     override fun onStop() {
         super.onStop()
 
-        // Android 버전이 23 이상
         if (Util.SDK_INT > 23) {
             releasePlayer()
         }

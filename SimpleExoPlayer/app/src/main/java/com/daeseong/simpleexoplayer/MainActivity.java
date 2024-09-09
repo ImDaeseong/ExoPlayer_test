@@ -11,18 +11,10 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
-import com.google.android.exoplayer2.DefaultLoadControl;
-import com.google.android.exoplayer2.DefaultRenderersFactory;
-import com.google.android.exoplayer2.ExoPlaybackException;
-import com.google.android.exoplayer2.ExoPlayer;
-import com.google.android.exoplayer2.ExoPlayerFactory;
-import com.google.android.exoplayer2.SimpleExoPlayer;
-import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.ProgressiveMediaSource;
-import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
-import com.google.android.exoplayer2.ui.PlayerView;
-import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
-import com.google.android.exoplayer2.util.Util;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.Player;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.ui.PlayerView;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -31,10 +23,9 @@ public class MainActivity extends AppCompatActivity {
     private static final String AUDIO_ASSET = "asset:///The Lazy Song.mp3";
 
     private PlayerView playerView;
-    private SimpleExoPlayer simpleExoPlayer;
+    private ExoPlayer player;
 
-    private Long currentPosition = 0L;
-    private int currentWindowIndex = 0;
+    private long currentPosition = 0L;
     private boolean playWhenReady = true;
     private boolean isVideoPlaying = false;
 
@@ -59,51 +50,46 @@ public class MainActivity extends AppCompatActivity {
 
     // ExoPlayer 초기화
     private void initializePlayer(String mediaUrl) {
-        if (simpleExoPlayer == null) {
-            DefaultRenderersFactory defaultRenderersFactory = new DefaultRenderersFactory(getApplicationContext());
-            DefaultTrackSelector defaultTrackSelector = new DefaultTrackSelector();
-            DefaultLoadControl defaultLoadControl = new DefaultLoadControl();
-
-            simpleExoPlayer = ExoPlayerFactory.newSimpleInstance(
-                    getApplicationContext(), defaultRenderersFactory, defaultTrackSelector, defaultLoadControl);
-
-            simpleExoPlayer.addListener(new ExoPlayer.EventListener() {
+        if (player == null) {
+            player = new ExoPlayer.Builder(this).build();
+            player.addListener(new Player.Listener() {
                 @Override
-                public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+                public void onPlaybackStateChanged(int playbackState) {
                     handlePlayerStateChanged(playbackState);
                 }
 
                 @Override
-                public void onPlayerError(ExoPlaybackException error) {
+                public void onPlayerError(androidx.media3.common.PlaybackException error) {
                     handleError();
                 }
             });
 
             // 화면 플레이어 연결
-            playerView.setPlayer(simpleExoPlayer);
+            playerView.setPlayer(player);
         }
 
-        MediaSource mediaSource = getMediaSource(Uri.parse(mediaUrl));
-        simpleExoPlayer.prepare(mediaSource, true, false);
-        simpleExoPlayer.setPlayWhenReady(playWhenReady);
+        MediaItem mediaItem = MediaItem.fromUri(Uri.parse(mediaUrl));
+        player.setMediaItem(mediaItem);
+        player.prepare();
+        player.setPlayWhenReady(playWhenReady);
     }
 
     // ExoPlayer 상태에 따른 처리
     private void handlePlayerStateChanged(int playbackState) {
         switch (playbackState) {
-            case ExoPlayer.STATE_READY:
+            case Player.STATE_READY:
                 Log.e(TAG, "재생 준비 완료");
                 button1.setVisibility(View.GONE);
                 break;
-            case ExoPlayer.STATE_BUFFERING:
+            case Player.STATE_BUFFERING:
                 Log.e(TAG, "재생 준비");
                 button1.setVisibility(View.GONE);
                 break;
-            case ExoPlayer.STATE_IDLE:
+            case Player.STATE_IDLE:
                 Log.e(TAG, "재생 실패");
                 button1.setVisibility(View.VISIBLE);
                 break;
-            case ExoPlayer.STATE_ENDED:
+            case Player.STATE_ENDED:
                 Log.e(TAG, "재생 마침");
                 button1.setVisibility(View.VISIBLE);
                 break;
@@ -118,40 +104,33 @@ public class MainActivity extends AppCompatActivity {
 
     // ExoPlayer 해제
     private void releasePlayer() {
-        if (simpleExoPlayer != null) {
-            currentPosition = simpleExoPlayer.getCurrentPosition();
-            currentWindowIndex = simpleExoPlayer.getCurrentWindowIndex();
-            playWhenReady = simpleExoPlayer.getPlayWhenReady();
+        if (player != null) {
+            currentPosition = player.getCurrentPosition();
+            playWhenReady = player.getPlayWhenReady();
 
             playerView.setPlayer(null);
-            simpleExoPlayer.release();
-            simpleExoPlayer = null;
+            player.release();
+            player = null;
         }
     }
 
     // 미디어 재생
     private void playMedia(Uri uri) {
-        if (simpleExoPlayer != null) {
-            MediaSource mediaSource = getMediaSource(uri);
-            simpleExoPlayer.prepare(mediaSource, true, false);
-            simpleExoPlayer.setPlayWhenReady(playWhenReady);
+        if (player != null) {
+            MediaItem mediaItem = MediaItem.fromUri(uri);
+            player.setMediaItem(mediaItem);
+            player.prepare();
+            player.setPlayWhenReady(playWhenReady);
         }
     }
 
     // 미디어 정지
     private void stopPlayer() {
-        if (simpleExoPlayer != null) {
-            currentPosition = simpleExoPlayer.getCurrentPosition();
-            currentWindowIndex = simpleExoPlayer.getCurrentWindowIndex();
-            playWhenReady = simpleExoPlayer.getPlayWhenReady();
-            simpleExoPlayer.stop();
+        if (player != null) {
+            currentPosition = player.getCurrentPosition();
+            playWhenReady = player.getPlayWhenReady();
+            player.stop();
         }
-    }
-
-    // 미디어 소스 가져오기
-    private MediaSource getMediaSource(Uri uri) {
-        String userAgent = Util.getUserAgent(this, getPackageName());
-        return new ProgressiveMediaSource.Factory(new DefaultDataSourceFactory(this, userAgent)).createMediaSource(uri);
     }
 
     @Override
@@ -186,18 +165,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-
-        if (Util.SDK_INT > 23) {
-            initializePlayer(VIDEO_URL);
-        }
+        initializePlayer(VIDEO_URL);
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-
-        if (Util.SDK_INT > 23) {
-            releasePlayer();
-        }
+        releasePlayer();
     }
 }

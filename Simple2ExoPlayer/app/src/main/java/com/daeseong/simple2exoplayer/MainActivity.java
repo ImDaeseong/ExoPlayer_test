@@ -19,17 +19,9 @@ import android.view.WindowManager;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.TextView;
-import com.google.android.exoplayer2.DefaultLoadControl;
-import com.google.android.exoplayer2.DefaultRenderersFactory;
-import com.google.android.exoplayer2.ExoPlayer;
-import com.google.android.exoplayer2.ExoPlayerFactory;
-import com.google.android.exoplayer2.Player;
-import com.google.android.exoplayer2.SimpleExoPlayer;
-import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.ProgressiveMediaSource;
-import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
-import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
-import com.google.android.exoplayer2.util.Util;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.Player;
+import androidx.media3.exoplayer.ExoPlayer;
 import java.util.ArrayList;
 import java.util.Formatter;
 import java.util.Locale;
@@ -38,7 +30,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = MainActivity.class.getSimpleName();
 
-    private SimpleExoPlayer simpleExoPlayer;
+    private ExoPlayer player;
     private ImageButton btnPre, btnPlay, btnPause, btnNext, btnPrevious, btnNextgo, btnSearch;
     private TextView txtStartTime, txtEndTime;
     private SeekBar seekBar;
@@ -178,7 +170,7 @@ public class MainActivity extends AppCompatActivity {
         btnPlay.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                simpleExoPlayer.setPlayWhenReady(true);
+                player.setPlayWhenReady(true);
                 btnPlay.setVisibility(View.INVISIBLE);
                 btnPause.setVisibility(View.VISIBLE);
             }
@@ -189,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
         btnPause.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                simpleExoPlayer.setPlayWhenReady(false);
+                player.setPlayWhenReady(false);
                 btnPlay.setVisibility(View.VISIBLE);
                 btnPause.setVisibility(View.INVISIBLE);
             }
@@ -201,20 +193,20 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
 
-                if(simpleExoPlayer == null) return;
+                if(player == null) return;
                 if(!fromUser) return;
 
-                simpleExoPlayer.seekTo(progress * 1000);
+                player.seekTo(progress * 1000);
             }
 
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
-                simpleExoPlayer.setPlayWhenReady(false);
+                player.setPlayWhenReady(false);
             }
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                simpleExoPlayer.setPlayWhenReady(true);
+                player.setPlayWhenReady(true);
             }
         });
     }
@@ -253,7 +245,7 @@ public class MainActivity extends AppCompatActivity {
                 if (!bPermissResult) {
                     requestPermissions.launch(PERMISSIONS33);
                 } else {
-                    Log.e(TAG, "PERMISSIONS33 권한 소유-SimpleExoPlayer 초기화");
+                    Log.e(TAG, "PERMISSIONS33 권한 소유-ExoPlayer 초기화");
                     initalizePlayer();
                 }
 
@@ -269,7 +261,7 @@ public class MainActivity extends AppCompatActivity {
                 if (!bPermissResult) {
                     requestPermissions.launch(PERMISSIONS);
                 } else {
-                    Log.e(TAG, "PERMISSIONS 권한 소유-SimpleExoPlayer 초기화");
+                    Log.e(TAG, "PERMISSIONS 권한 소유-ExoPlayer 초기화");
                     initalizePlayer();
                 }
             }
@@ -295,7 +287,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             if (bPhone && bAudio) {
-                Log.e(TAG, "PERMISSIONS 권한 소유-SimpleExoPlayer 초기화");
+                Log.e(TAG, "PERMISSIONS 권한 소유-ExoPlayer 초기화");
                 initalizePlayer();
             } else {
                 Log.e(TAG, "PERMISSIONS 권한 미소유");
@@ -314,32 +306,28 @@ public class MainActivity extends AppCompatActivity {
 
     private void initalizePlayer(){
 
-        if (simpleExoPlayer == null) {
+        if (player == null) {
 
-            DefaultRenderersFactory defaultRenderersFactory = new DefaultRenderersFactory(this.getApplicationContext());
-            DefaultTrackSelector defaultTrackSelector = new DefaultTrackSelector();
-            DefaultLoadControl defaultLoadControl = new DefaultLoadControl();
+            player = new ExoPlayer.Builder(this).build();
 
-            simpleExoPlayer = ExoPlayerFactory.newSimpleInstance(this.getApplicationContext(), defaultRenderersFactory, defaultTrackSelector, defaultLoadControl);
-
-            simpleExoPlayer.addListener(new Player.EventListener() {
+            player.addListener(new Player.Listener() {
                 @Override
-                public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+                public void onPlaybackStateChanged(int playbackState) {
                     switch (playbackState) {
-                        case ExoPlayer.STATE_READY:
+                        case Player.STATE_READY:
                             Log.e(TAG, "재생 준비 완료");
                             break;
-                        case ExoPlayer.STATE_BUFFERING:
+                        case Player.STATE_BUFFERING:
                             Log.e(TAG, "재생 준비");
                             break;
-                        case ExoPlayer.STATE_IDLE:
+                        case Player.STATE_IDLE:
                             Log.e(TAG, "재생 실패");
                             break;
-                        case ExoPlayer.STATE_ENDED:
+                        case Player.STATE_ENDED:
                             Log.e(TAG, "재생 마침");
 
                             //현재곡 완료시 다음곡 자동시작
-                            if(simpleExoPlayer != null) {
+                            if(player != null) {
                                 if(!isPlaying()){
 
                                     if(musicList.size() == 0) return;
@@ -363,68 +351,65 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
-            simpleExoPlayer.setVolume(1.0f);
+            player.setVolume(1.0f);
         }
     }
 
     private void releasePlayer(){
-        if (simpleExoPlayer != null) {
-            simpleExoPlayer.stop();
-            simpleExoPlayer.release();
-            simpleExoPlayer = null;
+        if (player != null) {
+            player.stop();
+            player.release();
+            player = null;
         }
     }
 
     private void playPlayer(String sUrl){
-        if(simpleExoPlayer != null){
-            MediaSource mediaSource = getMediaSource(Uri.parse(sUrl));
-            simpleExoPlayer.prepare(mediaSource, true, false);
-            simpleExoPlayer.setPlayWhenReady(true);
+        if(player != null){
+            MediaItem mediaItem = MediaItem.fromUri(Uri.parse(sUrl));
+            player.setMediaItem(mediaItem);
+            player.prepare();
+            player.setPlayWhenReady(true);
             setSeekBarProgress();
         }
     }
 
     private void playPlayer(Uri uri){
-        if(simpleExoPlayer != null){
-            MediaSource mediaSource = getMediaSource(uri);
-            simpleExoPlayer.prepare(mediaSource, true, false);
-            simpleExoPlayer.setPlayWhenReady(true);
+        if(player != null){
+            MediaItem mediaItem = MediaItem.fromUri(uri);
+            player.setMediaItem(mediaItem);
+            player.prepare();
+            player.setPlayWhenReady(true);
             setSeekBarProgress();
         }
     }
 
     private void stopPlayer(){
-        if (simpleExoPlayer != null) {
-            simpleExoPlayer.stop();
+        if (player != null) {
+            player.stop();
         }
     }
 
     private boolean isPlaying(){
-        if (simpleExoPlayer != null) {
-            return simpleExoPlayer.getPlaybackState() == Player.STATE_READY;
+        if (player != null) {
+            return player.getPlaybackState() == Player.STATE_READY;
         }
         return false;
     }
 
     private void PreplayPlayer(){
-        if (simpleExoPlayer != null) {
-            long position = simpleExoPlayer.getCurrentPosition();
+        if (player != null) {
+            long position = player.getCurrentPosition();
             position -= 3000;
-            simpleExoPlayer.seekTo(position);
+            player.seekTo(position);
         }
     }
 
     private void NextplayPlayer(){
-        if(simpleExoPlayer != null) {
-            long position = simpleExoPlayer.getCurrentPosition();
+        if(player != null) {
+            long position = player.getCurrentPosition();
             position += 3000;
-            simpleExoPlayer.seekTo(position);
+            player.seekTo(position);
         }
-    }
-
-    private MediaSource getMediaSource(Uri uri) {
-        String sUserAgent = Util.getUserAgent(this, getPackageName());
-        return new ProgressiveMediaSource.Factory(new DefaultDataSourceFactory(this, sUserAgent)).createMediaSource(uri);
     }
 
     private String stringForTime(int timeMs) {
@@ -462,18 +447,18 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onTick(long timeMillis) {
 
-                if (simpleExoPlayer.isPlaying()) {
+                if (player.isPlaying()) {
 
-                    long position = simpleExoPlayer.getCurrentPosition();
-                    long duration = simpleExoPlayer.getDuration();
+                    long position = player.getCurrentPosition();
+                    long duration = player.getDuration();
 
                     if (duration <= 0) return;
 
                     seekBar.setMax((int) duration / 1000);
                     seekBar.setProgress((int) position / 1000);
 
-                    txtStartTime.setText(stringForTime((int) simpleExoPlayer.getCurrentPosition()));
-                    txtEndTime.setText(stringForTime((int) simpleExoPlayer.getDuration()));
+                    txtStartTime.setText(stringForTime((int) player.getCurrentPosition()));
+                    txtEndTime.setText(stringForTime((int) player.getDuration()));
                 }
             }
         });

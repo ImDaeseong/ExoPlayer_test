@@ -7,25 +7,26 @@ import android.net.Uri;
 import android.os.Binder;
 import android.os.IBinder;
 import androidx.annotation.Nullable;
+import androidx.annotation.OptIn;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
-import com.google.android.exoplayer2.DefaultLoadControl;
-import com.google.android.exoplayer2.DefaultRenderersFactory;
-import com.google.android.exoplayer2.ExoPlayer;
-import com.google.android.exoplayer2.ExoPlayerFactory;
-import com.google.android.exoplayer2.Player;
-import com.google.android.exoplayer2.SimpleExoPlayer;
-import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.ProgressiveMediaSource;
-import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
-import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
-import com.google.android.exoplayer2.util.Log;
-import com.google.android.exoplayer2.util.Util;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.Player;
+import androidx.media3.common.util.UnstableApi;
+import androidx.media3.exoplayer.DefaultLoadControl;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.LoadControl;
+import androidx.media3.exoplayer.DefaultRenderersFactory;
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
+import androidx.media3.exoplayer.trackselection.TrackSelector;
+import androidx.media3.datasource.DefaultDataSourceFactory;
+import androidx.media3.exoplayer.source.ProgressiveMediaSource;
+import androidx.media3.common.util.Log;
+import androidx.media3.common.util.Util;
 
 public class MusicService extends Service {
 
     private static final String TAG = MusicService.class.getSimpleName();
-
-    private SimpleExoPlayer simpleExoPlayer;
+    private ExoPlayer exoPlayer;
     private LocalBroadcastManager localBroadcastManager;
     private final Binder binder = new MusicBinder();
 
@@ -35,60 +36,49 @@ public class MusicService extends Service {
         }
     }
 
+    @OptIn(markerClass = UnstableApi.class)
     @Override
     public void onCreate() {
 
-        Log.e(TAG, "onCreate");
+        //Log.e(TAG, "onCreate");
 
-        DefaultRenderersFactory defaultRenderersFactory = new DefaultRenderersFactory(this.getApplicationContext());
-        DefaultTrackSelector defaultTrackSelector = new DefaultTrackSelector();
-        DefaultLoadControl defaultLoadControl = new DefaultLoadControl();
+        DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(this.getApplicationContext());
+        TrackSelector trackSelector = new DefaultTrackSelector(this.getApplicationContext());
+        LoadControl loadControl = new DefaultLoadControl();
 
         localBroadcastManager = LocalBroadcastManager.getInstance(this);
 
-        simpleExoPlayer = ExoPlayerFactory.newSimpleInstance(this.getApplicationContext(), defaultRenderersFactory, defaultTrackSelector, defaultLoadControl);
+        // ExoPlayer.Builder 사용하여 플레이어 생성
+        exoPlayer = new ExoPlayer.Builder(this.getApplicationContext())
+                .setRenderersFactory(renderersFactory)
+                .setTrackSelector(trackSelector)
+                .setLoadControl(loadControl)
+                .build();
 
-        simpleExoPlayer.addListener(new SimpleExoPlayer.EventListener() {
+        exoPlayer.addListener(new Player.Listener() {
             @Override
             public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+                Intent intent = new Intent("com.daeseong.simple1exoplayer.PLAYER_STATUS");
 
-                if (playbackState == ExoPlayer.STATE_BUFFERING) {
-
-                    Log.e(TAG, "재생 준비");
-
-                    Intent intent = new Intent("com.daeseong.simple1exoplayer.PLAYER_STATUS");
-                    intent.putExtra("state", PlaybackState.STATE_BUFFERING);
-                    localBroadcastManager.sendBroadcast(intent);
-
-                } else if (playbackState == ExoPlayer.STATE_READY) {
-
-                    Log.e(TAG, "재생 준비 완료");
-
-                    Intent intent = new Intent("com.daeseong.simple1exoplayer.PLAYER_STATUS");
-                    if (playWhenReady) {
-                        intent.putExtra("state", PlaybackState.STATE_PLAYING);
-                    } else {
-                        intent.putExtra("state", PlaybackState.STATE_PAUSED);
-                    }
-                    localBroadcastManager.sendBroadcast(intent);
-
-                } else if (playbackState == ExoPlayer.STATE_ENDED) {
-
-                    Log.e(TAG, "재생 마침");
-
-                    Intent intent = new Intent("com.daeseong.simple1exoplayer.PLAYER_STATUS");
-                    intent.putExtra("state", PlaybackState.STATE_NONE);
-                    localBroadcastManager.sendBroadcast(intent);
-
-                } else if (playbackState == ExoPlayer.STATE_IDLE) {
-
-                    Log.e(TAG, "재생 실패");
-
-                    Intent intent = new Intent("com.daeseong.simple1exoplayer.PLAYER_STATUS");
-                    intent.putExtra("state", PlaybackState.STATE_ERROR);
-                    localBroadcastManager.sendBroadcast(intent);
+                switch (playbackState) {
+                    case Player.STATE_BUFFERING:
+                        Log.e(TAG, "재생 준비");
+                        intent.putExtra("state", PlaybackState.STATE_BUFFERING);
+                        break;
+                    case Player.STATE_READY:
+                        Log.e(TAG, playWhenReady ? "재생 준비 완료" : "일시 정지");
+                        intent.putExtra("state", playWhenReady ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED);
+                        break;
+                    case Player.STATE_ENDED:
+                        Log.e(TAG, "재생 마침");
+                        intent.putExtra("state", PlaybackState.STATE_NONE);
+                        break;
+                    case Player.STATE_IDLE:
+                        Log.e(TAG, "재생 실패");
+                        intent.putExtra("state", PlaybackState.STATE_ERROR);
+                        break;
                 }
-
+                localBroadcastManager.sendBroadcast(intent);
             }
         });
 
@@ -112,88 +102,79 @@ public class MusicService extends Service {
     }
 
     public void playPlayer(String sUrl) {
-        if (simpleExoPlayer != null) {
-            MediaSource mediaSource = getMediaSource(Uri.parse(sUrl));
-            simpleExoPlayer.prepare(mediaSource, true, false);
-            simpleExoPlayer.setPlayWhenReady(true);
+        if (exoPlayer != null) {
+            MediaItem mediaItem = MediaItem.fromUri(sUrl);
+            exoPlayer.setMediaItem(mediaItem);
+            exoPlayer.prepare();
+            exoPlayer.setPlayWhenReady(true);
         }
     }
 
     public void playPlayer(Uri uri) {
-        if (simpleExoPlayer != null) {
-            MediaSource mediaSource = getMediaSource(uri);
-            simpleExoPlayer.prepare(mediaSource, true, false);
-            simpleExoPlayer.setPlayWhenReady(true);
+        if (exoPlayer != null) {
+            MediaItem mediaItem = MediaItem.fromUri(uri);
+            exoPlayer.setMediaItem(mediaItem);
+            exoPlayer.prepare();
+            exoPlayer.setPlayWhenReady(true);
         }
     }
 
     public void stopPlayer() {
-        if (simpleExoPlayer != null) {
-            simpleExoPlayer.stop();
+        if (exoPlayer != null) {
+            exoPlayer.stop();
         }
     }
 
     public void releasePlayer() {
-        if (simpleExoPlayer != null) {
-            simpleExoPlayer.stop();
-            simpleExoPlayer.release();
-            simpleExoPlayer = null;
+        if (exoPlayer != null) {
+            exoPlayer.stop();
+            exoPlayer.release();
+            exoPlayer = null;
         }
     }
 
     public boolean isPlaying() {
-        if (simpleExoPlayer != null) {
-            return simpleExoPlayer.getPlaybackState() == Player.STATE_READY;
-        }
-        return false;
+        return exoPlayer != null && exoPlayer.getPlaybackState() == Player.STATE_READY;
     }
 
-    public void PreplayPlayer() {
-        if (simpleExoPlayer != null) {
-            long position = simpleExoPlayer.getCurrentPosition();
-            position -= 3000;
-            simpleExoPlayer.seekTo(position);
+    public void prePlayPlayer() {
+        if (exoPlayer != null) {
+            long position = exoPlayer.getCurrentPosition();
+            exoPlayer.seekTo(Math.max(position - 3000, 0));
         }
     }
 
-    public void NextplayPlayer() {
-        if (simpleExoPlayer != null) {
-            long position = simpleExoPlayer.getCurrentPosition();
-            position += 3000;
-            simpleExoPlayer.seekTo(position);
+    public void nextPlayPlayer() {
+        if (exoPlayer != null) {
+            long position = exoPlayer.getCurrentPosition();
+            exoPlayer.seekTo(position + 3000);
         }
     }
 
-    public void setPlayWhenReady(boolean bReady) {
-        if (simpleExoPlayer != null) {
-            simpleExoPlayer.setPlayWhenReady(bReady);
+    public void setPlayWhenReady(boolean playWhenReady) {
+        if (exoPlayer != null) {
+            exoPlayer.setPlayWhenReady(playWhenReady);
         }
     }
 
     public long getCurrentPosition() {
-        long position = 0;
-        if (simpleExoPlayer != null) {
-            position = simpleExoPlayer.getCurrentPosition();
-        }
-        return position;
+        return exoPlayer != null ? exoPlayer.getCurrentPosition() : 0;
     }
 
     public long getDuration() {
-        long duration = 0;
-        if (simpleExoPlayer != null) {
-            duration = simpleExoPlayer.getDuration();
-        }
-        return duration;
+        return exoPlayer != null ? exoPlayer.getDuration() : 0;
     }
 
-    public void seekTo(long progress) {
-        if (simpleExoPlayer != null) {
-            simpleExoPlayer.seekTo(progress);
+    public void seekTo(long position) {
+        if (exoPlayer != null) {
+            exoPlayer.seekTo(position);
         }
     }
 
-    private MediaSource getMediaSource(Uri uri) {
-        String sUserAgent = Util.getUserAgent(this, getPackageName());
-        return new ProgressiveMediaSource.Factory(new DefaultDataSourceFactory(this, sUserAgent)).createMediaSource(uri);
+    @OptIn(markerClass = UnstableApi.class)
+    private ProgressiveMediaSource getMediaSource(Uri uri) {
+        String userAgent = Util.getUserAgent(this, getPackageName());
+        return new ProgressiveMediaSource.Factory(new DefaultDataSourceFactory(this, userAgent))
+                .createMediaSource(MediaItem.fromUri(uri));
     }
 }

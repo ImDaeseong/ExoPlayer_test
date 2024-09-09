@@ -310,11 +310,15 @@ class MainActivity : AppCompatActivity() {
         val filter = IntentFilter()
         filter.addAction("android.intent.action.PHONE_STATE")
         filter.addAction("android.net.conn.CONNECTIVITY_CHANGE")
-        registerReceiver(broadcastReceiver, filter)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(broadcastReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(broadcastReceiver, filter)
+        }
 
         //music service
-        intentservice = Intent(this@MainActivity, MusicService::class.java)
-        bindService(intentservice, serviceConnection, BIND_AUTO_CREATE)
+        var intentservice: Intent? = Intent(this@MainActivity, MusicService::class.java)
+        bindService(intentservice as Intent, serviceConnection, BIND_AUTO_CREATE)
         LocalBroadcastManager.getInstance(this).registerReceiver(broadcastReceiver!!, IntentFilter("com.daeseong.simple1exoplayer.PLAYER_STATUS"))
     }
 

@@ -355,7 +355,11 @@ public class MainActivity extends AppCompatActivity {
         IntentFilter filter = new IntentFilter();
         filter.addAction("android.intent.action.PHONE_STATE");
         filter.addAction("android.net.conn.CONNECTIVITY_CHANGE");
-        registerReceiver(broadcastReceiver, filter);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(broadcastReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(broadcastReceiver, filter);
+        }
 
         //music service
         intentservice = new Intent(MainActivity.this, MusicService.class);
@@ -398,13 +402,13 @@ public class MainActivity extends AppCompatActivity {
 
     private void PreplayPlayer(){
         if(musicService != null ){
-            musicService.PreplayPlayer();
+            musicService.prePlayPlayer();
         }
     }
 
     private void NextplayPlayer(){
         if(musicService != null ){
-            musicService.NextplayPlayer();
+            musicService.nextPlayPlayer();
         }
     }
 

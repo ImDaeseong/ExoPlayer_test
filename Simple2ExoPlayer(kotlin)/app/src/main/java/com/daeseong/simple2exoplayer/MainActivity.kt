@@ -20,12 +20,9 @@ import android.widget.TextView
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.exoplayer2.*
-import com.google.android.exoplayer2.source.MediaSource
-import com.google.android.exoplayer2.source.ProgressiveMediaSource
-import com.google.android.exoplayer2.trackselection.DefaultTrackSelector
-import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
-import com.google.android.exoplayer2.util.Util
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import java.util.*
 
 class MainActivity : AppCompatActivity() {
@@ -43,10 +40,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var txtEndTime: TextView
     private lateinit var seekBar: SeekBar
 
-    private var simpleExoPlayer: SimpleExoPlayer? = null
+    private var exoPlayer: ExoPlayer? = null
     private var playerTimer: PlayerTimer? = null
     private val musicList = ArrayList<MusicInfo>()
-    private var CurrentPlayIndex = -1
+    private var currentPlayIndex = -1
 
     private lateinit var requestPermissions: ActivityResultLauncher<Array<String>>
 
@@ -68,8 +65,7 @@ class MainActivity : AppCompatActivity() {
         txtEndTime = findViewById(R.id.endTime)
         btnSearch = findViewById(R.id.btnSearch)
 
-        btnSearch.setOnClickListener(View.OnClickListener {
-
+        btnSearch.setOnClickListener {
             checkPermissions()
 
             //음악 폴더 선택
@@ -85,9 +81,7 @@ class MainActivity : AppCompatActivity() {
             val nIndex: Int = cursor?.getColumnIndex(MediaStore.Audio.AudioColumns.DATA) ?: -1
 
             cursor?.use {
-
                 while (cursor.moveToNext()) {
-
                     if (nIndex == -1) {
                         continue
                     }
@@ -102,101 +96,96 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            if (musicList.size == 0) return@OnClickListener
+            if (musicList.size == 0) return@setOnClickListener
 
-            CurrentPlayIndex = 0
+            currentPlayIndex = 0
 
-            val uri = Uri.parse(musicList[CurrentPlayIndex].musicPath)
+            val uri = Uri.parse(musicList[currentPlayIndex].musicPath)
             playPlayer(uri)
             btnPlay.visibility = View.INVISIBLE
             btnPause.visibility = View.VISIBLE
-        })
+        }
 
         //3초 뒤로
         btnPrevious = findViewById(R.id.btnPrevious)
-        btnPrevious.setOnClickListener(View.OnClickListener {
-
+        btnPrevious.setOnClickListener {
             PreplayPlayer()
-        })
+        }
 
         //3초 앞으로
         btnNextgo = findViewById(R.id.btnNextgo)
-        btnNextgo!!.setOnClickListener(View.OnClickListener {
-
+        btnNextgo.setOnClickListener {
             NextplayPlayer()
-        })
+        }
 
         //이전곡
         btnPre = findViewById(R.id.btnPre)
-        btnPre.setOnClickListener(View.OnClickListener {
+        btnPre.setOnClickListener {
+            if (musicList.size == 0) return@setOnClickListener
 
-            if (musicList.size == 0) return@OnClickListener
+            currentPlayIndex--
 
-            CurrentPlayIndex--
+            if (currentPlayIndex < 0) currentPlayIndex = musicList.size - 1
 
-            if (CurrentPlayIndex < 0) CurrentPlayIndex = musicList.size - 1
-
-            //Log.e(tag, "PreCurrentPlayIndex:" + CurrentPlayIndex)
-            val uri = Uri.parse(musicList[CurrentPlayIndex].musicPath)
+            //Log.e(tag, "PreCurrentPlayIndex:" + currentPlayIndex)
+            val uri = Uri.parse(musicList[currentPlayIndex].musicPath)
             playPlayer(uri)
             btnPlay.visibility = View.INVISIBLE
             btnPause.visibility = View.VISIBLE
-        })
+        }
 
         //다음곡
         btnNext = findViewById(R.id.btnNext)
-        btnNext.setOnClickListener(View.OnClickListener {
+        btnNext.setOnClickListener {
+            if (musicList.size == 0) return@setOnClickListener
 
-            if (musicList.size == 0) return@OnClickListener
+            currentPlayIndex++
 
-            CurrentPlayIndex++
+            if (currentPlayIndex > musicList.size - 1) currentPlayIndex = 0
 
-            if (CurrentPlayIndex > musicList.size - 1) CurrentPlayIndex = 0
-
-            //Log.e(tag, "NextCurrentPlayIndex:" + CurrentPlayIndex)
-            val uri = Uri.parse(musicList[CurrentPlayIndex].musicPath)
+            //Log.e(tag, "NextCurrentPlayIndex:" + currentPlayIndex)
+            val uri = Uri.parse(musicList[currentPlayIndex].musicPath)
             playPlayer(uri)
             btnPlay.visibility = View.INVISIBLE
             btnPause.visibility = View.VISIBLE
-        })
+        }
 
         //연주
         btnPlay = findViewById(R.id.btnPlay)
-        btnPlay.setOnClickListener(View.OnClickListener {
-            simpleExoPlayer!!.playWhenReady = true
+        btnPlay.setOnClickListener {
+            exoPlayer?.play()
             btnPlay.visibility = View.INVISIBLE
             btnPause.visibility = View.VISIBLE
-        })
+        }
 
         //일시정지
         btnPause = findViewById(R.id.btnPause)
-        btnPause.setOnClickListener(View.OnClickListener {
-            simpleExoPlayer!!.playWhenReady = false
+        btnPause.setOnClickListener {
+            exoPlayer?.pause()
             btnPlay.visibility = View.VISIBLE
             btnPause.visibility = View.INVISIBLE
-        })
+        }
 
         //진행바
-        seekBar = findViewById<View>(R.id.seekBar) as SeekBar
+        seekBar = findViewById(R.id.seekBar)
         seekBar.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                if (simpleExoPlayer == null) return
+                if (exoPlayer == null) return
                 if (!fromUser) return
-                simpleExoPlayer!!.seekTo((progress * 1000).toLong())
+                exoPlayer?.seekTo((progress * 1000).toLong())
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar) {
-                simpleExoPlayer!!.playWhenReady = false
+                exoPlayer?.playWhenReady = false
             }
 
             override fun onStopTrackingTouch(seekBar: SeekBar) {
-                simpleExoPlayer!!.playWhenReady = true
+                exoPlayer?.playWhenReady = true
             }
         })
     }
 
     private fun InitTitleBar() {
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             val window = window
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
@@ -213,62 +202,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkPermissions() {
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-
-            var bPermissResult = false
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-
-                for (permission in PERMISSIONS33) {
-                    bPermissResult = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
-                    if (!bPermissResult) {
-                        break
-                    }
-                }
-
-                if (!bPermissResult) {
-                    requestPermissions.launch(PERMISSIONS33)
-                } else {
-                    Log.e(tag, "PERMISSIONS33 권한 소유-SimpleExoPlayer 초기화")
-                    initalizePlayer()
-                }
-
+            val permissionsToCheck = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) PERMISSIONS33 else PERMISSIONS
+            if (permissionsToCheck.any { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }) {
+                requestPermissions.launch(permissionsToCheck)
             } else {
-
-                for (permission in PERMISSIONS) {
-                    bPermissResult = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
-                    if (!bPermissResult) {
-                        break
-                    }
-                }
-
-                if (!bPermissResult) {
-                    requestPermissions.launch(PERMISSIONS)
-                } else {
-                    Log.e(tag, "PERMISSIONS 권한 소유-SimpleExoPlayer 초기화")
-                    initalizePlayer()
-                }
+                Log.e(tag, "PERMISSIONS 권한 소유-SimpleExoPlayer 초기화")
+                initalizePlayer()
             }
         }
     }
 
     private fun initPermissionsLauncher() {
-
         requestPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-
-            var bPhone = false
-            var bAudio = false
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                bPhone =  java.lang.Boolean.TRUE == result[READ_PHONE_STATE]
-                bAudio =  java.lang.Boolean.TRUE == result[READ_MEDIA_AUDIO]
+            val bPhone = result[READ_PHONE_STATE] == true
+            val bAudio = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                result[READ_MEDIA_AUDIO] == true
             } else {
-                bPhone =  java.lang.Boolean.TRUE == result[READ_PHONE_STATE]
-                bAudio =  java.lang.Boolean.TRUE == result[READ_EXTERNAL_STORAGE]
+                result[READ_EXTERNAL_STORAGE] == true
             }
 
             if (bPhone && bAudio) {
-                Log.e(tag,"PERMISSIONS 권한 소유-SimpleExoPlayer 초기화")
+                Log.e(tag, "PERMISSIONS 권한 소유-SimpleExoPlayer 초기화")
                 initalizePlayer()
             } else {
                 Log.e(tag, "PERMISSIONS 권한 미소유")
@@ -278,123 +233,111 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-
         musicList.clear()
         stopplayerTimer()
         releasePlayer()
     }
 
     private fun initalizePlayer() {
+        if (exoPlayer == null) {
+            exoPlayer = ExoPlayer.Builder(this).build()
 
-        if (simpleExoPlayer == null) {
-
-            val defaultRenderersFactory = DefaultRenderersFactory(this.applicationContext)
-            val defaultTrackSelector = DefaultTrackSelector()
-            val defaultLoadControl = DefaultLoadControl()
-            simpleExoPlayer = ExoPlayerFactory.newSimpleInstance(this.applicationContext, defaultRenderersFactory, defaultTrackSelector, defaultLoadControl)
-
-            simpleExoPlayer!!.addListener(object : Player.EventListener {
-                override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
+            exoPlayer?.addListener(object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
                     when (playbackState) {
-                        ExoPlayer.STATE_READY -> Log.e(tag, "재생 준비 완료")
-                        ExoPlayer.STATE_BUFFERING -> Log.e(tag, "재생 준비")
-                        ExoPlayer.STATE_IDLE -> Log.e(tag, "재생 실패")
-                        ExoPlayer.STATE_ENDED -> {
+                        Player.STATE_READY -> Log.e(tag, "재생 준비 완료")
+                        Player.STATE_BUFFERING -> Log.e(tag, "재생 준비")
+                        Player.STATE_IDLE -> Log.e(tag, "재생 실패")
+                        Player.STATE_ENDED -> {
                             Log.e(tag, "재생 마침")
+                            if (!isPlaying) {
+                                if (musicList.size == 0) return
 
-                            //현재곡 완료시 다음곡 자동시작
-                            if (simpleExoPlayer != null) {
+                                currentPlayIndex++
+                                if (currentPlayIndex > musicList.size - 1) currentPlayIndex = 0
 
-                                if (!isPlaying) {
-
-                                    if (musicList.size == 0) return
-
-                                    CurrentPlayIndex++
-
-                                    if (CurrentPlayIndex > musicList.size - 1) CurrentPlayIndex = 0
-
-                                    //Log.e(tag, "NextCurrentPlayIndex:" + CurrentPlayIndex)
-                                    val uri = Uri.parse(musicList[CurrentPlayIndex].musicPath)
-                                    playPlayer(uri)
-                                    btnPlay.visibility = View.INVISIBLE
-                                    btnPause.visibility = View.VISIBLE
-                                }
+                                //Log.e(tag, "NextCurrentPlayIndex:" + currentPlayIndex)
+                                val uri = Uri.parse(musicList[currentPlayIndex].musicPath)
+                                playPlayer(uri)
+                                btnPlay.visibility = View.INVISIBLE
+                                btnPause.visibility = View.VISIBLE
                             }
                         }
                     }
                 }
             })
-            simpleExoPlayer!!.volume = 1.0f
+            exoPlayer?.volume = 1.0f
         }
     }
 
     private fun releasePlayer() {
-        if (simpleExoPlayer != null) {
-            simpleExoPlayer!!.stop()
-            simpleExoPlayer!!.release()
-            simpleExoPlayer = null
-        }
-    }
-
-    private fun playPlayer(sUrl: String) {
-        if (simpleExoPlayer != null) {
-            val mediaSource = getMediaSource(Uri.parse(sUrl))
-            simpleExoPlayer!!.prepare(mediaSource, true, false)
-            simpleExoPlayer!!.playWhenReady = true
-            setSeekBarProgress()
+        exoPlayer?.let {
+            it.stop()
+            it.release()
+            exoPlayer = null
         }
     }
 
     private fun playPlayer(uri: Uri) {
-        if (simpleExoPlayer != null) {
-            val mediaSource = getMediaSource(uri)
-            simpleExoPlayer!!.prepare(mediaSource, true, false)
-            simpleExoPlayer!!.playWhenReady = true
+        exoPlayer?.let {
+            val mediaItem = MediaItem.fromUri(uri)
+            it.setMediaItem(mediaItem)
+            it.prepare()
+            it.play()
             setSeekBarProgress()
         }
     }
 
     private fun stopPlayer() {
-        if (simpleExoPlayer != null) {
-            simpleExoPlayer!!.stop()
-        }
+        exoPlayer?.stop()
     }
 
     private val isPlaying: Boolean
-        private get() = if (simpleExoPlayer != null) {
-            simpleExoPlayer!!.playbackState == Player.STATE_READY
-        } else false
+        get() = exoPlayer?.playbackState == Player.STATE_READY
 
     private fun PreplayPlayer() {
-        if (simpleExoPlayer != null) {
-            var position = simpleExoPlayer!!.currentPosition
+        exoPlayer?.let {
+            var position = it.currentPosition
             position -= 3000
-            simpleExoPlayer!!.seekTo(position)
+            it.seekTo(position)
         }
     }
 
     private fun NextplayPlayer() {
-        if (simpleExoPlayer != null) {
-            var position = simpleExoPlayer!!.currentPosition
+        exoPlayer?.let {
+            var position = it.currentPosition
             position += 3000
-            simpleExoPlayer!!.seekTo(position)
+            it.seekTo(position)
         }
     }
 
-    private fun getMediaSource(uri: Uri): MediaSource {
-        val sUserAgent = Util.getUserAgent(this, packageName)
-        return ProgressiveMediaSource.Factory(DefaultDataSourceFactory(this, sUserAgent)).createMediaSource(uri)
+    private fun setSeekBarProgress() {
+        stopplayerTimer()
+        playerTimer = PlayerTimer()
+        playerTimer?.setCallback(object : PlayerTimer.Callback {
+            override fun onTick(timeMillis: Long) {
+                exoPlayer?.let {
+                    if (it.isPlaying) {
+                        val position = it.currentPosition
+                        val duration = it.duration
+                        if (duration <= 0) return
+                        seekBar.max = (duration / 1000).toInt()
+                        seekBar.progress = (position / 1000).toInt()
+                        txtStartTime.text = stringForTime(it.currentPosition.toInt())
+                        txtEndTime.text = stringForTime(it.duration.toInt())
+                    }
+                }
+            }
+        })
+        playerTimer?.start()
     }
 
     private fun stringForTime(timeMs: Int): String {
-        val mFormatter: Formatter
-        val mFormatBuilder: StringBuilder = StringBuilder()
-        mFormatter = Formatter(mFormatBuilder, Locale.getDefault())
+        val mFormatter = Formatter(StringBuilder(), Locale.getDefault())
         val totalSeconds = timeMs / 1000
         val seconds = totalSeconds % 60
         val minutes = totalSeconds / 60 % 60
         val hours = totalSeconds / 3600
-        mFormatBuilder.setLength(0)
         return if (hours > 0) {
             mFormatter.format("%d:%02d:%02d", hours, minutes, seconds).toString()
         } else {
@@ -403,29 +346,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun stopplayerTimer() {
-        if (playerTimer != null) {
-            playerTimer!!.stop()
+        playerTimer?.let {
+            it.stop()
             playerTimer = null
         }
     }
-
-    private fun setSeekBarProgress() {
-        stopplayerTimer()
-        playerTimer = PlayerTimer()
-        playerTimer!!.setCallback(object : PlayerTimer.Callback {
-            override fun onTick(timeMillis: Long) {
-                if (simpleExoPlayer!!.isPlaying) {
-                    val position = simpleExoPlayer!!.currentPosition
-                    val duration = simpleExoPlayer!!.duration
-                    if (duration <= 0) return
-                    seekBar.max = duration.toInt() / 1000
-                    seekBar.progress = position.toInt() / 1000
-                    txtStartTime.text = stringForTime(simpleExoPlayer!!.currentPosition.toInt())
-                    txtEndTime.text = stringForTime(simpleExoPlayer!!.duration.toInt())
-                }
-            }
-        })
-        playerTimer!!.start()
-    }
-
 }

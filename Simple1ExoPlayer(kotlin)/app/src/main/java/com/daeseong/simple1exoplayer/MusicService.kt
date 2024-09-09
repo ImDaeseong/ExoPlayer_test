@@ -6,20 +6,22 @@ import android.media.session.PlaybackState
 import android.net.Uri
 import android.os.Binder
 import android.os.IBinder
+import android.util.Log
+import androidx.annotation.OptIn
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.google.android.exoplayer2.*
-import com.google.android.exoplayer2.source.MediaSource
-import com.google.android.exoplayer2.source.ProgressiveMediaSource
-import com.google.android.exoplayer2.trackselection.DefaultTrackSelector
-import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
-import com.google.android.exoplayer2.util.Log
-import com.google.android.exoplayer2.util.Util
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 
 class MusicService : Service() {
 
     private val tag = MusicService::class.java.simpleName
 
-    private var simpleExoPlayer: SimpleExoPlayer? = null
+    private var exoPlayer: ExoPlayer? = null
     private lateinit var localBroadcastManager: LocalBroadcastManager
     private val binder = MusicBinder()
 
@@ -34,37 +36,32 @@ class MusicService : Service() {
 
         Log.e(tag, "onCreate")
 
-        val defaultRenderersFactory = DefaultRenderersFactory(applicationContext)
-        val defaultTrackSelector = DefaultTrackSelector()
-        val defaultLoadControl = DefaultLoadControl()
-
         localBroadcastManager = LocalBroadcastManager.getInstance(this)
 
-        simpleExoPlayer = ExoPlayerFactory.newSimpleInstance(applicationContext, defaultRenderersFactory, defaultTrackSelector, defaultLoadControl)
+        exoPlayer = ExoPlayer.Builder(applicationContext).build()
 
-        simpleExoPlayer?.addListener(object : Player.EventListener {
-            override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
+        exoPlayer?.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
-
-                    ExoPlayer.STATE_BUFFERING -> {
+                    Player.STATE_BUFFERING -> {
                         Log.e(tag, "재생 준비")
                         sendPlayerStatusBroadcast(PlaybackState.STATE_BUFFERING)
                     }
 
-                    ExoPlayer.STATE_READY -> {
+                    Player.STATE_READY -> {
                         Log.e(tag, "재생 준비 완료")
                         sendPlayerStatusBroadcast(
-                            if (playWhenReady) PlaybackState.STATE_PLAYING
+                            if (exoPlayer?.playWhenReady == true) PlaybackState.STATE_PLAYING
                             else PlaybackState.STATE_PAUSED
                         )
                     }
 
-                    ExoPlayer.STATE_ENDED -> {
+                    Player.STATE_ENDED -> {
                         Log.e(tag, "재생 마침")
                         sendPlayerStatusBroadcast(PlaybackState.STATE_NONE)
                     }
 
-                    ExoPlayer.STATE_IDLE -> {
+                    Player.STATE_IDLE -> {
                         Log.e(tag, "재생 실패")
                         sendPlayerStatusBroadcast(PlaybackState.STATE_ERROR)
                     }
@@ -85,40 +82,44 @@ class MusicService : Service() {
         return super.onUnbind(intent)
     }
 
+    @OptIn(UnstableApi::class)
     fun playPlayer(sUrl: String) {
-        simpleExoPlayer?.let {
+        exoPlayer?.let {
             val mediaSource = getMediaSource(Uri.parse(sUrl))
-            it.prepare(mediaSource, true, false)
+            it.setMediaSource(mediaSource)
+            it.prepare()
             it.playWhenReady = true
         }
     }
 
+    @OptIn(UnstableApi::class)
     fun playPlayer(uri: Uri) {
-        simpleExoPlayer?.let {
+        exoPlayer?.let {
             val mediaSource = getMediaSource(uri)
-            it.prepare(mediaSource, true, false)
+            it.setMediaSource(mediaSource)
+            it.prepare()
             it.playWhenReady = true
         }
     }
 
     fun stopPlayer() {
-        simpleExoPlayer?.stop()
+        exoPlayer?.stop()
     }
 
     fun releasePlayer() {
-        simpleExoPlayer?.let {
+        exoPlayer?.let {
             it.stop()
             it.release()
-            simpleExoPlayer = null
+            exoPlayer = null
         }
     }
 
     fun isPlaying(): Boolean {
-        return simpleExoPlayer?.playbackState == Player.STATE_READY
+        return exoPlayer?.playbackState == Player.STATE_READY && exoPlayer?.playWhenReady == true
     }
 
     fun preplayPlayer() {
-        simpleExoPlayer?.let {
+        exoPlayer?.let {
             var position = it.currentPosition
             position -= 3000
             it.seekTo(position)
@@ -126,7 +127,7 @@ class MusicService : Service() {
     }
 
     fun nextplayPlayer() {
-        simpleExoPlayer?.let {
+        exoPlayer?.let {
             var position = it.currentPosition
             position += 3000
             it.seekTo(position)
@@ -134,24 +135,26 @@ class MusicService : Service() {
     }
 
     fun setPlayWhenReady(bReady: Boolean) {
-        simpleExoPlayer?.playWhenReady = bReady
+        exoPlayer?.playWhenReady = bReady
     }
 
     fun getCurrentPosition(): Long {
-        return simpleExoPlayer?.currentPosition ?: 0
+        return exoPlayer?.currentPosition ?: 0
     }
 
     fun getDuration(): Long {
-        return simpleExoPlayer?.duration ?: 0
+        return exoPlayer?.duration ?: 0
     }
 
     fun seekTo(progress: Long) {
-        simpleExoPlayer?.seekTo(progress)
+        exoPlayer?.seekTo(progress)
     }
 
+    @OptIn(UnstableApi::class)
     private fun getMediaSource(uri: Uri): MediaSource {
-        val userAgent = Util.getUserAgent(this, packageName)
-        return ProgressiveMediaSource.Factory(DefaultDataSourceFactory(this, userAgent)).createMediaSource(uri)
+        val dataSourceFactory = DefaultDataSource.Factory(this)
+        return ProgressiveMediaSource.Factory(dataSourceFactory)
+            .createMediaSource(MediaItem.fromUri(uri))
     }
 
     private fun sendPlayerStatusBroadcast(state: Int) {
